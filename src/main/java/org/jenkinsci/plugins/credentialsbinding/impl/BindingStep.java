@@ -40,11 +40,15 @@ import java.io.OutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.apache.commons.lang.StringUtils;
 import org.jenkinsci.plugins.credentialsbinding.MultiBinding;
 import org.jenkinsci.plugins.workflow.steps.AbstractStepDescriptorImpl;
 import org.jenkinsci.plugins.workflow.steps.AbstractStepExecutionImpl;
@@ -125,15 +129,27 @@ public final class BindingStep extends AbstractStepImpl {
     }
 
     /** Similar to {@code MaskPasswordsOutputStream}. */
-    private static final class Filter extends ConsoleLogFilter implements Serializable {
+    static final class Filter extends ConsoleLogFilter implements Serializable {
+    	
+    	private static final class StringLengthListComparator implements Comparator<String> {
+
+			@Override
+			public int compare(String s1, String s2) {
+				return s1.length() - s2.length();
+			}
+    		
+    	}
 
         private static final long serialVersionUID = 1;
 
         private final Secret pattern;
 
         Filter(Collection<String> secrets) {
+        	List<String> longestSecretFirstlist = new ArrayList<String>(secrets);
+        	Collections.sort(longestSecretFirstlist, new StringLengthListComparator());
+        	Collections.reverse(longestSecretFirstlist);
             StringBuilder b = new StringBuilder();
-            for (String secret : secrets) {
+            for (String secret : longestSecretFirstlist) {
                 if (b.length() > 0) {
                     b.append('|');
                 }

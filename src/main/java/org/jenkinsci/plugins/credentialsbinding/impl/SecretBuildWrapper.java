@@ -24,20 +24,25 @@
 
 package org.jenkinsci.plugins.credentialsbinding.impl;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.jenkinsci.plugins.credentialsbinding.MultiBinding;
+import org.kohsuke.stapler.DataBoundConstructor;
+
 import hudson.Extension;
 import hudson.Launcher;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.BuildListener;
+import hudson.model.Run.RunnerAbortedException;
 import hudson.tasks.BuildWrapper;
 import hudson.tasks.BuildWrapperDescriptor;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import org.jenkinsci.plugins.credentialsbinding.MultiBinding;
-import org.kohsuke.stapler.DataBoundConstructor;
 
 @SuppressWarnings({"rawtypes", "unchecked"}) // inherited from BuildWrapper
 public class SecretBuildWrapper extends BuildWrapper {
@@ -70,6 +75,19 @@ public class SecretBuildWrapper extends BuildWrapper {
                 return true;
             }
         };
+    }
+    
+    @Override
+    public OutputStream decorateLogger(AbstractBuild build, OutputStream logger)
+    		throws IOException, InterruptedException, RunnerAbortedException {
+    	Map<String,String> overrides = new HashMap<String,String>();
+        List<MultiBinding.Unbinder> unbinders = new ArrayList<MultiBinding.Unbinder>();
+        for (MultiBinding<?> binding : bindings) {
+            MultiBinding.MultiEnvironment environment = binding.bind(build, build.getWorkspace(), null, null);
+            unbinders.add(environment.getUnbinder());
+            overrides.putAll(environment.getValues());
+        }
+        return new BindingStep.Filter(overrides.values()).decorateLogger(build, logger);
     }
 
     @Override public void makeSensitiveBuildVariables(AbstractBuild build, Set<String> sensitiveVariables) {
